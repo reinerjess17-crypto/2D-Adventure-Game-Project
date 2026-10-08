@@ -179,4 +179,22 @@ public class TileMap {
             }
         }
     }
+    // Is the point at this WORLD position (in pixels) blocked?
+    public boolean isSolidAtPixel(double worldX, double worldY) {
+    // pixel -> tile. Math.floor rounds DOWN, which is correct for negatives too
+        int col = (int) Math.floor(worldX / GameSettings.TILE_SIZE);
+        int row = (int) Math.floor(worldY / GameSettings.TILE_SIZE);
+
+        // Outside the map counts as solid,  so nobody can leave the world
+        if (col < 0 || row < 0 || col >= mapCols || row >= mapRows){
+            return true;
+        }
+        return isSolidTile(map[row][col]);
+    }
+    // The ONE place that decides which tile types block movement.
+    // To make sand solid later, you change only this line.
+    private boolean isSolidTile(byte tile) {
+        return tile == WATER;
+    }
+    
 }

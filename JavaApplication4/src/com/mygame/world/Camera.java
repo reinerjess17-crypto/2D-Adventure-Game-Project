@@ -26,4 +26,9 @@ public class Camera {
         x = Math.max(0, Math.min(x, maxX));
         y = Math.max(0, Math.min(y, maxY));
     }
+    // Places the camera so the target point is in the middle of the view
+    public void follow(double targetX, double targetY, int viewWidth, int viewHeight){
+         x = (int) Math.round(targetX - viewWidth / 2.0);
+    y = (int) Math.round(targetY - viewHeight / 2.0);
+    }
 }

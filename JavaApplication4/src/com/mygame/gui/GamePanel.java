@@ -4,6 +4,7 @@ import com.mygame.main.GameSettings;
 import com.mygame.world.TileMap;
 import com.mygame.input.KeyHandler;
 import com.mygame.world.Camera;
+import com.mygame.entity.Player;
 
 import javax.swing.JPanel;
 import java.awt.Dimension;
@@ -19,6 +20,7 @@ public class GamePanel extends JPanel {
     private TileMap tileMap = new TileMap("/res/maps/MainWorld.csv");
     private final KeyHandler keyHandler = new KeyHandler();
     private final Camera camera = new Camera();
+    private final Player player = new Player(10 * GameSettings.TILE_SIZE, 10 * GameSettings.TILE_SIZE);
 
     
     public GamePanel() {
@@ -37,6 +39,7 @@ public class GamePanel extends JPanel {
     public KeyHandler getKeyHandler() {return keyHandler;}
     public Camera getCamera() {return camera;}
     public TileMap getTileMap() {return tileMap;}
+    public Player getPlayer() {return player;}
     //Draws the current game frame
     public void render(){
         Graphics2D g2 = gameScreen.createGraphics();
@@ -47,9 +50,10 @@ public class GamePanel extends JPanel {
         
         tileMap.draw(g2, camera.getX(), camera.getY()); 
 
-        // Temporary test square: one tile
+        //The player
         g2.setColor(Color.GREEN);
-        g2.fillRect(320,180, GameSettings.TILE_SIZE, GameSettings.TILE_SIZE);
+        tileMap.draw(g2, camera.getX(), camera.getY());
+        player.draw(g2, camera.getX(), camera.getY());
        
         g2.dispose();//release the drawing tool
     }

@@ -4,6 +4,7 @@ import com.mygame.gui.GamePanel;
 import com.mygame.world.Camera;
 import com.mygame.input.KeyHandler;
 import com.mygame.world.TileMap;
+import com.mygame.entity.Player;
 
 public class GameEngine implements Runnable {
     private Thread gameThread;// The thread that continuously runs the game loop
@@ -45,19 +46,19 @@ public class GameEngine implements Runnable {
     }
     //dito nangyayari ang mga pangyayari! really?! yes
     public void update(){
-        final int speed = 16; //pixels per fram (4 x 60 FPS = 240 pixels per second);
-
-        KeyHandler Keys = gamePanel.getKeyHandler();
+        KeyHandler keys = gamePanel.getKeyHandler();
         Camera camera = gamePanel.getCamera();
-        
-        if (Keys.upPressed)   camera.move(0, -speed);
-        if (Keys.downPressed) camera.move(0, speed);
-        if (Keys.leftPressed) camera.move(-speed, 0);
-        if (Keys.rightPressed)camera.move(speed,0);
-
-        // After moving, make sure the camera hasn't left the world
         TileMap map = gamePanel.getTileMap();
-        camera.clamp(map.getWidthInPixels(), map.getHeightInPixels(), GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
+        Player player = gamePanel.getPlayer();
+
+        player.update(keys, map);   // <- the only line that changed
+
+        camera.follow(player.getCenterX(), player.getCenterY(),
+                    GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
+
+        camera.clamp(map.getWidthInPixels(), map.getHeightInPixels(),
+                    GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
     }
+    
    
 }
