@@ -1,46 +1,61 @@
 package com.mygame.entity;
 
+import com.mygame.input.KeyHandler;
 import com.mygame.main.GameSettings;
 import com.mygame.world.TileMap;
-import com.mygame.input.KeyHandler;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
 
+// The player: it has its own position in the WORLD, moves with the keys,
+// and is stopped by solid tiles. The camera follows it.
 public class Player {
-    //Position in the WORLD (pixels)
+
+    // Position in the WORLD (pixels). "double" allows fractions of a pixel,
+    // which diagonal movement needs.
     private double x;
     private double y;
-    
-    private final double speed = 2.0;// pixels per frame
-    private final int size = GameSettings.TILE_SIZE;// the picture is 32x32
- 
-    // NEW: the hitbox is the invisible box used for collision.
-    // It starts 4 pixels inside the picture and is 24x24.
+
+    private final double speed = 2.0;                   // pixels per frame (2 x 60 = 120 per second)
+    private final int size = GameSettings.TILE_SIZE;    // the picture is one tile big (32x32)
+
+    // The HITBOX is the invisible box used for collision.
+    // It is smaller than the picture and sits inside it, so only the "feet"
+    // touch walls. It starts 4 pixels inside the picture and is 24x24.
     private final int hitboxOffset = 4;
     private final int hitboxSize = 24;
- 
-    public Player(double startX, double startY){
+
+    // Creates the player at a WORLD position (in pixels).
+    // Make sure the start is not on water, or the player is stuck.
+    public Player(double startX, double startY) {
         this.x = startX;
         this.y = startY;
     }
-    // NEW: asks "if the player stood at (newX, newY), would it touch a solid tile?"
-    private boolean collides(TileMap map, double newX, double newY){
+
+    // Asks: "if the player stood at (newX, newY), would it touch a solid tile?"
+    // Returns true = blocked, false = free.
+    private boolean collides(TileMap map, double newX, double newY) {
         // The four edges of the hitbox at that position
         double left = newX + hitboxOffset;
         double top = newY + hitboxOffset;
+        // "- 1" because a box 24 wide starting at pixel 4 covers pixels 4 to 27,
+        // so the last pixel INSIDE the box is one less than start + size
         double right = left + hitboxSize - 1;
         double bottom = top + hitboxSize - 1;
-        
-         // Check the four corners. If any corner is on a solid tile, it collides.
+
+        // Check the four corners. The box is smaller than a tile, so if any
+        // part of it touches a solid tile, at least one corner is on it.
+        // "||" means "or": one blocked corner is enough.
         return map.isSolidAtPixel(left, top)
-            || map.isSolidAtPixel(right,top)
+            || map.isSolidAtPixel(right, top)
             || map.isSolidAtPixel(left, bottom)
             || map.isSolidAtPixel(right, bottom);
     }
-     // CHANGED: it now receives the map, instead of the world width and height
+
+    // Runs once per frame: reads the keys and moves the player.
     public void update(KeyHandler keys, TileMap map) {
-        // 1. Read the keys into a direction
+        // 1. Turn the keys into a direction: -1, 0 or 1 on each axis.
+        //    Opposite keys cancel each other (left + right = 0).
         int dirX = 0;
         int dirY = 0;
         if (keys.leftPressed)  dirX -= 1;
@@ -48,34 +63,36 @@ public class Player {
         if (keys.upPressed)    dirY -= 1;
         if (keys.downPressed)  dirY += 1;
 
-        // 2. Normalize so diagonal speed equals straight speed
+        // 2. Normalize: make the direction always have length 1.
+        //    A diagonal (1,1) is 1.41 long, which made diagonal movement faster.
+        //    Dividing by the length fixes that.
         double length = Math.sqrt(dirX * dirX + dirY * dirY);
-        if (length == 0) return;   // no key pressed, so nothing to do
+        if (length == 0) return;   // no key pressed: nothing to do, leave early
 
-        double dx = dirX / length * speed;   // how far to move on X this frame
-        double dy = dirY / length * speed;   // how far to move on Y this frame
+        double dx = dirX / length * speed;   // distance to move on X this frame
+        double dy = dirY / length * speed;   // distance to move on Y this frame
 
         // 3. Move on X only if the new spot is free
         if (!collides(map, x + dx, y)) {
             x += dx;
         }
-        // 4. Then move on Y only if the new spot is free
+        // 4. Then move on Y with its own separate check.
+        //    Testing the axes separately lets the player SLIDE along walls
+        //    instead of sticking when pushing diagonally.
         if (!collides(map, x, y + dy)) {
             y += dy;
         }
     }
 
-    // Same as before
+    // Draws the player. WORLD position minus camera position = SCREEN position.
     public void draw(Graphics2D g2, int cameraX, int cameraY) {
         int screenX = (int) Math.round(x) - cameraX;
         int screenY = (int) Math.round(y) - cameraY;
-        g2.setColor(Color.GREEN);
+        g2.setColor(Color.GREEN);                 // placeholder until we have a sprite
         g2.fillRect(screenX, screenY, size, size);
     }
 
-    // Same as before
+    // The middle of the player: this is the point the camera follows
     public double getCenterX() { return x + size / 2.0; }
     public double getCenterY() { return y + size / 2.0; }
-
-
 }

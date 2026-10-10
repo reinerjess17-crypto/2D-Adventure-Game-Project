@@ -1,64 +1,73 @@
 package com.mygame.main;
 
-import com.mygame.gui.GamePanel;
-import com.mygame.world.Camera;
-import com.mygame.input.KeyHandler;
-import com.mygame.world.TileMap;
 import com.mygame.entity.Player;
+import com.mygame.gui.GamePanel;
+import com.mygame.input.KeyHandler;
+import com.mygame.world.Camera;
+import com.mygame.world.TileMap;
 
+// The heart of the game: runs the loop that updates and draws 60 times per second.
 public class GameEngine implements Runnable {
-    private Thread gameThread;// The thread that continuously runs the game loop
-    private GamePanel gamePanel;// Reference to the panel responsible for drawing the game
-    private double drawInterval;//how much time should pass between frames
-    private double nextDrawTime;//when should the next frame happen
+    private Thread gameThread;      // the thread that continuously runs the game loop
+    private GamePanel gamePanel;    // the panel responsible for drawing the game
+    private double drawInterval;    // how much time should pass between frames (nanoseconds)
+    private double nextDrawTime;    // when the next frame should happen
 
     // Receives the GamePanel that this engine will control
-    public GameEngine(GamePanel gamePanel){
+    public GameEngine(GamePanel gamePanel) {
         this.gamePanel = gamePanel;
     }
-    // Creates and starts the game thread
+
+    // Creates and starts the game thread. This calls run() on a separate thread.
     public void startGameThread() {
         gameThread = new Thread(this);
         gameThread.start();
     }
-    @Override 
-    //dito nagsismula ang game loop pare.
+
+    @Override
+    // The game loop starts here
     public void run() {
-        drawInterval = 1_000_000_000.0 / GameSettings.FPS;// Calculates how many nanoseconds one frame should take
-        nextDrawTime = System.nanoTime() + drawInterval;// Sets the target time for the first frame
-        // Keeps the game running while the thread exists
+        drawInterval = 1_000_000_000.0 / GameSettings.FPS;   // nanoseconds per frame
+        nextDrawTime = System.nanoTime() + drawInterval;     // target time of the first frame
+
         while (gameThread != null) {
-            update();// Updates the game's objects and logic
-            gamePanel.render();
-            gamePanel.repaint();// Tells Swing that the GamePanel needs to be redrawn
-            long remainingTime = (long)(nextDrawTime - System.nanoTime());
-            //wait until it's time for the next frame
-            if (remainingTime > 0){
-                try{
-                    // Converts nanoseconds to milliseconds for Thread.sleep()
-                     long sleepTime = remainingTime / 1_000_000L;
+            update();               // 1. change the game's data (move things)
+            gamePanel.render();     // 2. draw the data onto the hidden canvas
+            gamePanel.repaint();    // 3. ask Swing to show the canvas on the window
+
+            // How long until the next frame is due?
+            long remainingTime = (long) (nextDrawTime - System.nanoTime());
+            if (remainingTime > 0) {
+                try {
+                    // Thread.sleep wants milliseconds, so convert from nanoseconds
+                    long sleepTime = remainingTime / 1_000_000L;
                     Thread.sleep(sleepTime);
-                }catch(InterruptedException e){e.printStackTrace();// Handles an interruption of the game thread
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
-            nextDrawTime += drawInterval;// Sets the target time for the next frame
+            nextDrawTime += drawInterval;   // schedule the next frame
         }
     }
-    //dito nangyayari ang mga pangyayari! really?! yes
-    public void update(){
+
+    // Runs once per frame. The ORDER of the steps matters.
+    public void update() {
+        // Get the objects we need from the panel
         KeyHandler keys = gamePanel.getKeyHandler();
         Camera camera = gamePanel.getCamera();
         TileMap map = gamePanel.getTileMap();
         Player player = gamePanel.getPlayer();
 
-        player.update(keys, map);   // <- the only line that changed
+        // 1. Move the player (this includes the collision checks)
+        player.update(keys, map);
 
+        // 2. Point the camera at the player.
+        //    This comes AFTER the player moves, or the camera would lag one frame behind.
         camera.follow(player.getCenterX(), player.getCenterY(),
-                    GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
+                GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
 
+        // 3. Keep the camera inside the world, so no black area shows
         camera.clamp(map.getWidthInPixels(), map.getHeightInPixels(),
-                    GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
+                GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT);
     }
-    
-   
 }
