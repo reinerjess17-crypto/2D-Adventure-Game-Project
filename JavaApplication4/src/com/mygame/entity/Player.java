@@ -7,6 +7,8 @@ import com.mygame.world.TileMap;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.awt.AlphaComposite;
+import java.awt.Composite;
 
 // The player: it has its own position in the WORLD, moves with the keys,
 // and is stopped by solid tiles. The camera follows it.
@@ -27,11 +29,28 @@ public class Player {
     private final int hitboxOffset = 4;
     private final int hitboxSize = 24;
 
+    // ----- Health -----
+    private final int maxHealth = 100;
+    private int health = maxHealth;
+
+    // ----- Death and respawn -----
+    private enum State { ALIVE, DYING, RESPAWNING }
+    private State state = State.ALIVE;
+    private int stateTimer = 0;                          // ticks spent in the current state
+    private static final int DYING_TICKS = 90;           // 1.5 seconds at 60 ticks per second
+    private static final int RESPAWN_TICKS = 45;         // 0.75 seconds
+
+    // Where the player comes back after dying (world pixels)
+    private double spawnX;
+    private double spawnY;
+
     // Creates the player at a WORLD position (in pixels).
     // Make sure the start is not on water, or the player is stuck.
     public Player(double startX, double startY) {
         this.x = startX;
         this.y = startY;
+        this.spawnX = startX;
+        this.spawnY = startY;
     }
 
     // Asks: "if the player stood at (newX, newY), would it touch a solid tile?"
@@ -56,6 +75,11 @@ public class Player {
 
     // Runs once per frame: reads the keys and moves the player.
     public void update(KeyHandler keys, TileMap map) {
+        // While dying or respawning, ignore the keys and just run the sequence
+        if (state != State.ALIVE) {
+            updateDeathSequence();
+            return;
+        }
         // 1. Turn the keys into a direction: -1, 0 or 1 on each axis.
         //    Opposite keys cancel each other (left + right = 0).
         int dirX = 0;
@@ -121,19 +145,20 @@ public class Player {
             : sprites.getIdle(facing);
 
         if (image != null) {
-            // Anchor the picture to the BOTTOM-CENTER of the player's 32x32 box.
-            // For a 32x32 image this changes nothing. For a taller sprite, the
-            // feet stay in the right place and the head sticks out above.
-            int bob = (!moving && frameIndex == 1) ? 1 : 0;   // idle only: sink 1 pixel
+            // 1 = fully visible, 0 = invisible. While dying, the sprite is gone by the halfway point.
+            float alpha = 1f;
+            if (state == State.DYING) {
+            alpha = Math.max(0f, 1f - 2f * stateTimer / DYING_TICKS);
+            }
+
             int drawX = screenX + (size - image.getWidth()) / 2;
-            int drawY = screenY + size - image.getHeight() + bob;
+            int drawY = screenY + size - image.getHeight();
+
+            Composite oldComposite = g2.getComposite();    // remember the normal setting
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
             g2.drawImage(image, drawX, drawY, null);
-        } else {
-            // Image missing: draw the old green square so the game stays playable
-            g2.setColor(Color.GREEN);
-            g2.fillRect(screenX, screenY, size, size);
+            g2.setComposite(oldComposite);                 // ALWAYS put it back
         }
-        
 
     }
 
@@ -151,4 +176,59 @@ public class Player {
     private static final int FRAMES_PER_STEP = 8;
     private int animTimer = 0;      // counts ticks
     private int frameIndex = 0;     // which walking frame is showing (0 to 3)
+
+    // Lose health. Dying starts when it reaches 0.
+    public void takeDamage(int amount) {
+        if (state != State.ALIVE) return;             // already dying: can't die twice
+
+        health = Math.max(0, health - amount);        // never go below 0
+
+        if (health == 0) {
+            state = State.DYING;
+            stateTimer = 0;
+            moving = false;                           // stand still while dying
+            frameIndex = 0;
+            animTimer = 0;
+        }
+    }
+
+    // Gain health, never more than the maximum
+    public void heal(int amount) {
+        if (state != State.ALIVE) return;
+        health = Math.min(maxHealth, health + amount);
+    }
+
+    // Where he comes back after dying. Later, a campfire can call this to set a checkpoint.
+    public void setSpawnPoint(double newSpawnX, double newSpawnY) {
+        spawnX = newSpawnX;
+        spawnY = newSpawnY;
+    }
+
+    public int getHealth() { return health; }
+    public int getMaxHealth() { return maxHealth; }
+
+    private void updateDeathSequence() {
+        stateTimer++;
+
+        if (state == State.DYING && stateTimer >= DYING_TICKS) {
+            // The screen is fully black now, so the jump back is hidden.
+            x = spawnX;
+            y = spawnY;
+            health = maxHealth;
+            facing = Direction.DOWN;
+            state = State.RESPAWNING;
+            stateTimer = 0;
+
+        } else if (state == State.RESPAWNING && stateTimer >= RESPAWN_TICKS) {
+            state = State.ALIVE;                  // the screen is clear again: control returns
+            stateTimer = 0;
+        }
+    }
+    public float getScreenFade() {
+        switch (state) {
+            case DYING:      return (float) stateTimer / DYING_TICKS;           // 0 -> 1
+            case RESPAWNING: return 1f - (float) stateTimer / RESPAWN_TICKS;    // 1 -> 0
+            default:         return 0f;
+        }
+    }
 }

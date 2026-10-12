@@ -36,6 +36,8 @@ public class GamePanel extends JPanel {
     // is water on your map: tile number x 32 = pixel position.
     private final Player player = new Player(10 * GameSettings.TILE_SIZE, 10 * GameSettings.TILE_SIZE);
 
+    private final Hud hud = new Hud();
+
     // ----- Constructor -----
 
     public GamePanel() {
@@ -74,6 +76,9 @@ public class GamePanel extends JPanel {
 
         // 2. The player on top of the world
         player.draw(g2, camera.getX(), camera.getY());
+
+        player.draw(g2, camera.getX(), camera.getY());
+        hud.draw(g2, player);          // always last: it sits on top of everything
 
         g2.dispose();   // release the drawing tool
     }

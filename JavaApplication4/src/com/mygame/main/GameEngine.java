@@ -61,6 +61,12 @@ public class GameEngine implements Runnable {
         // 1. Move the player (this includes the collision checks)
         player.update(keys, map);
 
+        // TEMPORARY test: press K to lose 10 health. Delete when enemies exist.
+        if (keys.damageRequested) {
+            keys.damageRequested = false;
+            player.takeDamage(10);
+        }
+
         // 2. Point the camera at the player.
         //    This comes AFTER the player moves, or the camera would lag one frame behind.
         camera.follow(player.getCenterX(), player.getCenterY(),

@@ -14,6 +14,9 @@ public class KeyHandler implements KeyListener {
     // always sees the newest value instead of an old copy.
     public volatile boolean upPressed, downPressed, leftPressed, rightPressed;
 
+    public volatile boolean damageRequested;
+    private boolean damageKeyHeld;
+
     // Called by Swing when a key goes DOWN
     @Override
     public void keyPressed(KeyEvent e) {
@@ -52,6 +55,12 @@ public class KeyHandler implements KeyListener {
             case KeyEvent.VK_D:
             case KeyEvent.VK_RIGHT:
                 rightPressed = isPressed;
+                break;
+            case KeyEvent.VK_K:
+                if (isPressed && !damageKeyHeld){
+                    damageRequested = true;
+                }
+                damageKeyHeld = isPressed;
                 break;
         }
     }
