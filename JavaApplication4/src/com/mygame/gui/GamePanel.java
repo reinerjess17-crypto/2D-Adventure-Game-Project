@@ -1,10 +1,12 @@
 package com.mygame.gui;
 
+import com.mygame.entity.EntityManager;
 import com.mygame.entity.Player;
 import com.mygame.input.KeyHandler;
 import com.mygame.main.GameSettings;
 import com.mygame.world.Camera;
 import com.mygame.world.TileMap;
+import com.mygame.entity.LifeBerry;
 
 import javax.swing.JPanel;
 import java.awt.Color;
@@ -32,9 +34,13 @@ public class GamePanel extends JPanel {
     // Decides which part of the world is visible
     private final Camera camera = new Camera();
 
-    // The player, starting at tile (10, 10). Change these numbers if that spot
-    // is water on your map: tile number x 32 = pixel position.
-    private final Player player = new Player(10 * GameSettings.TILE_SIZE, 10 * GameSettings.TILE_SIZE);
+    // The player now receives the KeyHandler, because it reads the keys itself.
+    // keyHandler is declared ABOVE this line, so it already exists when this runs.
+    private final Player player = new Player(10 * GameSettings.TILE_SIZE,
+        10 * GameSettings.TILE_SIZE, keyHandler);
+
+    // Owns and runs every entity. The player is added to it automatically.
+    private final EntityManager entityManager = new EntityManager(tileMap, player);
 
     private final Hud hud = new Hud();
 
@@ -52,13 +58,16 @@ public class GamePanel extends JPanel {
         // TYPE_INT_RGB: no transparency needed for the canvas.
         gameScreen = new BufferedImage(GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT,
                 BufferedImage.TYPE_INT_RGB);
+        // TEMPORARY test: a berry two tiles to the right of wherever the player starts.
+        // It doesn't matter how big the map is or where the start is, it will be on screen.
+        entityManager.add(new LifeBerry(player.getX() + 2 * GameSettings.TILE_SIZE, player.getY()));
     }
-
     // ----- Getters: the engine uses these to reach things that are private here -----
     public KeyHandler getKeyHandler() { return keyHandler; }
     public Camera getCamera() { return camera; }
     public TileMap getTileMap() { return tileMap; }
     public Player getPlayer() { return player; }
+    public EntityManager getEntityManager() { return entityManager;}
 
     // ----- Drawing -----
 
@@ -77,8 +86,10 @@ public class GamePanel extends JPanel {
         // 2. The player on top of the world
         player.draw(g2, camera.getX(), camera.getY());
 
-        player.draw(g2, camera.getX(), camera.getY());
-        hud.draw(g2, player);          // always last: it sits on top of everything
+        // 3. The HUD always goes last: it sits on top of everything
+        hud.draw(g2, player);         // always last: it sits on top of everything
+
+        entityManager.draw(g2, camera.getX(), camera.getY());
 
         g2.dispose();   // release the drawing tool
     }

@@ -5,6 +5,7 @@ import com.mygame.gui.GamePanel;
 import com.mygame.input.KeyHandler;
 import com.mygame.world.Camera;
 import com.mygame.world.TileMap;
+import com.mygame.entity.EntityManager;
 
 // The heart of the game: runs the loop that updates and draws 60 times per second.
 public class GameEngine implements Runnable {
@@ -57,9 +58,10 @@ public class GameEngine implements Runnable {
         Camera camera = gamePanel.getCamera();
         TileMap map = gamePanel.getTileMap();
         Player player = gamePanel.getPlayer();
+        EntityManager entities = gamePanel.getEntityManager();
 
-        // 1. Move the player (this includes the collision checks)
-        player.update(keys, map);
+        // 1. Update every entity. The player is one of them, so it moves here.
+        entities.update();
 
         // TEMPORARY test: press K to lose 10 health. Delete when enemies exist.
         if (keys.damageRequested) {

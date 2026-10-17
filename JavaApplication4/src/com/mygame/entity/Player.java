@@ -2,84 +2,77 @@ package com.mygame.entity;
 
 import com.mygame.input.KeyHandler;
 import com.mygame.main.GameSettings;
-import com.mygame.world.TileMap;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
 import java.awt.AlphaComposite;
 import java.awt.Composite;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 
-// The player: it has its own position in the WORLD, moves with the keys,
-// and is stopped by solid tiles. The camera follows it.
-public class Player {
+// The player. It is a Creature, so it INHERITS from Creature (and Entity):
+//   position, size, hitbox, health, speed, facing, sprites, takeDamage(), heal(),
+//   moveWithCollision(), getCenterX()/getCenterY()
+// This class only contains what is special about the player:
+// keyboard control, walk animation, and the death and respawn sequence.
+public class Player extends Creature {
 
-    // Position in the WORLD (pixels). "double" allows fractions of a pixel,
-    // which diagonal movement needs.
-    private double x;
-    private double y;
+    // ----- Constants -----
+    private static final int MAX_HEALTH = 100;
+    private static final double WALK_SPEED = 2.0;       // pixels per tick (2 x 60 = 120 per second)
+    private static final int FRAMES_PER_STEP = 8;       // 8 ticks per walking frame = 7.5 frames per second
+    private static final int IDLE_TICKS = 30;           // 30 ticks = half a second per idle step
+    private static final int DYING_TICKS = 90;          // 1.5 seconds at 60 ticks per second
+    private static final int RESPAWN_TICKS = 45;        // 0.75 seconds
+    private static final int HIT_PROTECTION_TICKS = 30; // half a second of protection after a hit
 
-    private final double speed = 2.0;                   // pixels per frame (2 x 60 = 120 per second)
-    private final int size = GameSettings.TILE_SIZE;    // the picture is one tile big (32x32)
-    private static final int IDLE_TICKS = 30;   // 30 ticks = half a second per step
+    // ----- Fields that only the player has -----
+    private final KeyHandler keys;        // where the player reads the keyboard from
 
-    // The HITBOX is the invisible box used for collision.
-    // It is smaller than the picture and sits inside it, so only the "feet"
-    // touch walls. It starts 4 pixels inside the picture and is 24x24.
-    private final int hitboxOffset = 4;
-    private final int hitboxSize = 24;
+    private boolean moving = false;       // true while a movement key is held
+    private int animTimer = 0;            // counts ticks for the animation
+    private int frameIndex = 0;           // which walking frame is showing (0 to 3)
 
-    // ----- Health -----
-    private final int maxHealth = 100;
-    private int health = maxHealth;
-
-    // ----- Death and respawn -----
-    private enum State { ALIVE, DYING, RESPAWNING }
-    private State state = State.ALIVE;
-    private int stateTimer = 0;                          // ticks spent in the current state
-    private static final int DYING_TICKS = 90;           // 1.5 seconds at 60 ticks per second
-    private static final int RESPAWN_TICKS = 45;         // 0.75 seconds
+    private PlayerState state = PlayerState.ALIVE;
+    private int stateTimer = 0;           // ticks spent in the current state
+    private Interactable interactTarget;    // the closest thing we could use right now (or null)
 
     // Where the player comes back after dying (world pixels)
     private double spawnX;
     private double spawnY;
 
+    // ----- Constructor -----
+
     // Creates the player at a WORLD position (in pixels).
     // Make sure the start is not on water, or the player is stuck.
-    public Player(double startX, double startY) {
-        this.x = startX;
-        this.y = startY;
+    public Player(double startX, double startY, KeyHandler keys) {
+        // super(...) runs the Creature constructor, which runs the Entity constructor.
+        // We hand them the size (one tile), health, speed and the player's images.
+        super(startX, startY, GameSettings.TILE_SIZE, GameSettings.TILE_SIZE,
+              MAX_HEALTH, WALK_SPEED, SpriteSet.load("/res/player", 4));
+        this.keys = keys;
         this.spawnX = startX;
         this.spawnY = startY;
     }
 
-    // Asks: "if the player stood at (newX, newY), would it touch a solid tile?"
-    // Returns true = blocked, false = free.
-    private boolean collides(TileMap map, double newX, double newY) {
-        // The four edges of the hitbox at that position
-        double left = newX + hitboxOffset;
-        double top = newY + hitboxOffset;
-        // "- 1" because a box 24 wide starting at pixel 4 covers pixels 4 to 27,
-        // so the last pixel INSIDE the box is one less than start + size
-        double right = left + hitboxSize - 1;
-        double bottom = top + hitboxSize - 1;
+    // ----- Update: runs once per tick, called by the EntityManager -----
 
-        // Check the four corners. The box is smaller than a tile, so if any
-        // part of it touches a solid tile, at least one corner is on it.
-        // "||" means "or": one blocked corner is enough.
-        return map.isSolidAtPixel(left, top)
-            || map.isSolidAtPixel(right, top)
-            || map.isSolidAtPixel(left, bottom)
-            || map.isSolidAtPixel(right, bottom);
-    }
+    @Override
+    public void update(EntityManager manager) {
+        tickTimers();   // counts down invulnerableTicks (from Creature)
 
-    // Runs once per frame: reads the keys and moves the player.
-    public void update(KeyHandler keys, TileMap map) {
-        // While dying or respawning, ignore the keys and just run the sequence
-        if (state != State.ALIVE) {
+        if (state != PlayerState.ALIVE) {
+            interactTarget = null;                  // nothing to use while dying
+            keys.interactRequested = false;         // forget presses made during the fade
             updateDeathSequence();
             return;
         }
+
+        // Look around every tick, so the HUD can show a prompt while we stand near something
+        interactTarget = manager.findInteractableNear(this);
+        if (keys.interactRequested) {
+            keys.interactRequested = false;         // consume the press: one press = one use
+            tryInteract();
+        }
+
         // 1. Turn the keys into a direction: -1, 0 or 1 on each axis.
         //    Opposite keys cancel each other (left + right = 0).
         int dirX = 0;
@@ -89,114 +82,100 @@ public class Player {
         if (keys.upPressed)    dirY -= 1;
         if (keys.downPressed)  dirY += 1;
 
-        // 2. Normalize: make the direction always have length 1.
-        //    A diagonal (1,1) is 1.41 long, which made diagonal movement faster.
-        //    Dividing by the length fixes that.
+        // 2. Normalize: make the direction always have length 1, so a diagonal
+        //    (length 1.41) is not faster than a straight line.
         double length = Math.sqrt(dirX * dirX + dirY * dirY);
-        if (length == 0) {
-            if (moving) {                 // we JUST stopped: start the idle cycle fresh
-                moving = false;
-                animTimer = 0;
-                frameIndex = 0;
-            }
-            animTimer++;
-            if (animTimer >= IDLE_TICKS) {
-                animTimer = 0;
-                frameIndex = 1 - frameIndex;   // flips 0 -> 1 -> 0 -> 1 ...
-            }
-            return;
-        }
+        boolean isMoving = length > 0;
 
-        if (!moving) {                    // we JUST started walking: start the walk cycle fresh
-            moving = true;
+        updateAnimation(isMoving);
+        if (!isMoving) return;                       // no keys: nothing to move
+
+        facing = Direction.fromInput(dirX, dirY);    // 'facing' lives in Creature
+
+        // 3. Move. moveWithCollision (in Creature) checks X and Y separately,
+        //    so the player slides along walls. The map comes from the manager.
+        double dx = dirX / length * speed;           // 'speed' lives in Creature
+        double dy = dirY / length * speed;
+        moveWithCollision(dx, dy, manager.getMap());
+    }
+
+    // Advances the walk/idle animation. isMoving = is a movement key held THIS tick?
+    private void updateAnimation(boolean isMoving) {
+        // We just started walking or just stopped: restart the cycle from frame 0
+        if (isMoving != moving) {
+            moving = isMoving;
             animTimer = 0;
             frameIndex = 0;
         }
-        facing = Direction.fromInput(dirX, dirY);
 
         animTimer++;
-        if (animTimer >= FRAMES_PER_STEP) {
-            animTimer = 0;
-            frameIndex = (frameIndex + 1) % PlayerSprites.WALK_FRAMES;
-        }
-
-        double dx = dirX / length * speed;   // distance to move on X this frame
-        double dy = dirY / length * speed;   // distance to move on Y this frame
-
-        // 3. Move on X only if the new spot is free
-        if (!collides(map, x + dx, y)) {
-            x += dx;
-        }
-        // 4. Then move on Y with its own separate check.
-        //    Testing the axes separately lets the player SLIDE along walls
-        //    instead of sticking when pushing diagonally.
-        if (!collides(map, x, y + dy)) {
-            y += dy;
-        }
-    }
-
-    // Draws the player. WORLD position minus camera position = SCREEN position.
-    public void draw(Graphics2D g2, int cameraX, int cameraY) {
-        int screenX = (int) Math.round(x) - cameraX;
-        int screenY = (int) Math.round(y) - cameraY;
-
-        // Pick the right image: walking frame while moving, idle image when still
-        BufferedImage image = moving ? sprites.getWalk(facing, frameIndex)
-            : sprites.getIdle(facing);
-
-        if (image != null) {
-            // 1 = fully visible, 0 = invisible. While dying, the sprite is gone by the halfway point.
-            float alpha = 1f;
-            if (state == State.DYING) {
-            alpha = Math.max(0f, 1f - 2f * stateTimer / DYING_TICKS);
+        if (moving) {
+            if (animTimer >= FRAMES_PER_STEP) {
+                animTimer = 0;
+                frameIndex = (frameIndex + 1) % sprites.getWalkFrames();
             }
-
-            int drawX = screenX + (size - image.getWidth()) / 2;
-            int drawY = screenY + size - image.getHeight();
-
-            Composite oldComposite = g2.getComposite();    // remember the normal setting
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-            g2.drawImage(image, drawX, drawY, null);
-            g2.setComposite(oldComposite);                 // ALWAYS put it back
-        }
-
-    }
-
-    // The middle of the player: this is the point the camera follows
-    public double getCenterX() { return x + size / 2.0; }
-    public double getCenterY() { return y + size / 2.0; }
-
-    private final PlayerSprites sprites = new PlayerSprites();
-
-    private Direction facing = Direction.DOWN;   // which way the player looks
-    private boolean moving = false;              // true while a movement key is held
-
-    // Animation: every FRAMES_PER_STEP game ticks, we show the next walking frame.
-    // update() runs 60 times per second, so 8 ticks = 7.5 frames per second.
-    private static final int FRAMES_PER_STEP = 8;
-    private int animTimer = 0;      // counts ticks
-    private int frameIndex = 0;     // which walking frame is showing (0 to 3)
-
-    // Lose health. Dying starts when it reaches 0.
-    public void takeDamage(int amount) {
-        if (state != State.ALIVE) return;             // already dying: can't die twice
-
-        health = Math.max(0, health - amount);        // never go below 0
-
-        if (health == 0) {
-            state = State.DYING;
-            stateTimer = 0;
-            moving = false;                           // stand still while dying
-            frameIndex = 0;
+        } else if (animTimer >= IDLE_TICKS) {
             animTimer = 0;
+            frameIndex = 1 - frameIndex;   // flips 0 -> 1 -> 0 (draw() only has one idle image for now)
         }
     }
 
-    // Gain health, never more than the maximum
-    public void heal(int amount) {
-        if (state != State.ALIVE) return;
-        health = Math.min(maxHealth, health + amount);
+    // ----- Draw -----
+
+    @Override
+    public void draw(Graphics2D g2, int camX, int camY) {
+        // WORLD position minus camera position = SCREEN position
+        int screenX = (int) Math.round(x) - camX;
+        int screenY = (int) Math.round(y) - camY;
+
+        // Walking frame while moving, idle image when still
+        BufferedImage image = moving ? sprites.getWalk(facing, frameIndex)
+                                     : sprites.getIdle(facing);
+        if (image == null) return;   // the file failed to load: draw nothing
+
+        // 1 = fully visible, 0 = invisible. While dying, the sprite is gone by the halfway point.
+        float alpha = 1f;
+        if (state == PlayerState.DYING) {
+            alpha = Math.max(0f, 1f - 2f * stateTimer / DYING_TICKS);
+        }
+
+        // Center the picture horizontally and put its bottom on the bottom of the tile
+        int drawX = screenX + (width - image.getWidth()) / 2;
+        int drawY = screenY + height - image.getHeight();
+
+        Composite oldComposite = g2.getComposite();    // remember the normal setting
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        g2.drawImage(image, drawX, drawY, null);
+        g2.setComposite(oldComposite);                 // ALWAYS put it back
     }
+
+    // ----- Health -----
+
+    // We override takeDamage only to ADD something after the normal behavior.
+    @Override
+    public void takeDamage(int amount) {
+        int healthBefore = health;
+        super.takeDamage(amount);     // Creature does the real work (and calls onDeath at 0)
+
+        // If the hit really landed and we survived, give a short protection window,
+        // so one enemy touch can't drain the whole bar in a few ticks.
+        if (health < healthBefore && isAlive()) {
+            invulnerableTicks = HIT_PROTECTION_TICKS;
+        }
+    }
+
+    // Creature calls this by itself when health reaches 0.
+    // The player does not vanish: it starts the dying sequence.
+    @Override
+    protected void onDeath() {
+        state = PlayerState.DYING;
+        stateTimer = 0;
+        moving = false;               // stand still while dying
+        frameIndex = 0;
+        animTimer = 0;
+    }
+
+    // ----- Death and respawn -----
 
     // Where he comes back after dying. Later, a campfire can call this to set a checkpoint.
     public void setSpawnPoint(double newSpawnX, double newSpawnY) {
@@ -204,26 +183,28 @@ public class Player {
         spawnY = newSpawnY;
     }
 
-    public int getHealth() { return health; }
-    public int getMaxHealth() { return maxHealth; }
-
     private void updateDeathSequence() {
         stateTimer++;
 
-        if (state == State.DYING && stateTimer >= DYING_TICKS) {
+        if (state == PlayerState.DYING && stateTimer >= DYING_TICKS) {
             // The screen is fully black now, so the jump back is hidden.
             x = spawnX;
             y = spawnY;
             health = maxHealth;
             facing = Direction.DOWN;
-            state = State.RESPAWNING;
+            state = PlayerState.RESPAWNING;
             stateTimer = 0;
+            // Health is full again, but nothing should hurt the player while the
+            // screen is still fading in. The new invulnerability timer covers that.
+            invulnerableTicks = RESPAWN_TICKS;
 
-        } else if (state == State.RESPAWNING && stateTimer >= RESPAWN_TICKS) {
-            state = State.ALIVE;                  // the screen is clear again: control returns
+        } else if (state == PlayerState.RESPAWNING && stateTimer >= RESPAWN_TICKS) {
+            state = PlayerState.ALIVE;    // the screen is clear again: control returns
             stateTimer = 0;
         }
     }
+
+    // How black the screen should be: 0 = clear, 1 = fully black. The HUD reads this.
     public float getScreenFade() {
         switch (state) {
             case DYING:      return (float) stateTimer / DYING_TICKS;           // 0 -> 1
@@ -231,4 +212,13 @@ public class Player {
             default:         return 0f;
         }
     }
+    // Uses whatever we found nearby (if anything)
+    private void tryInteract() {
+        if (interactTarget != null) {
+            interactTarget.interact(this);
+        }
+    } 
+
+    // The HUD reads this to show the prompt
+    public Interactable getInteractTarget() { return interactTarget; }
 }

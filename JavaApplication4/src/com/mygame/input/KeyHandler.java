@@ -15,6 +15,8 @@ public class KeyHandler implements KeyListener {
     public volatile boolean upPressed, downPressed, leftPressed, rightPressed;
 
     public volatile boolean damageRequested;
+    public volatile boolean interactRequested;   
+    private boolean interactKeyHeld;
     private boolean damageKeyHeld;
 
     // Called by Swing when a key goes DOWN
@@ -61,6 +63,12 @@ public class KeyHandler implements KeyListener {
                     damageRequested = true;
                 }
                 damageKeyHeld = isPressed;
+                break;
+            case KeyEvent.VK_E:
+                if (isPressed && !interactKeyHeld) {
+                    interactRequested = true;     // one press = one request, even if E is held
+                }
+                interactKeyHeld = isPressed;
                 break;
         }
     }

@@ -2,12 +2,13 @@ package com.mygame.gui;
 
 import com.mygame.entity.Player;
 import com.mygame.main.GameSettings;
+import com.mygame.entity.Interactable;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics2D;
-
+import java.awt.FontMetrics;
 // Everything drawn on top of the game that is NOT part of the world:
 // the life bar now, and later items, dialogue boxes and menus.
 public class Hud {
@@ -20,7 +21,24 @@ public class Hud {
 
     public void draw(Graphics2D g2, Player player) {
         drawHealthBar(g2, player);
-        drawFadeOverlay(g2, player);   // last, so it covers the bar too
+        drawInteractPrompt(g2, player);
+        drawFadeOverlay(g2, player);   // still last, so it covers everything
+    }
+
+    // Shows "[E] Pick berry" at the bottom center while something is in reach
+    private void drawInteractPrompt(Graphics2D g2, Player player) {
+        Interactable target = player.getInteractTarget();
+        if (target == null) return;                          // nothing nearby: draw nothing
+
+        String text = "[E] " + target.getPrompt();
+        FontMetrics metrics = g2.getFontMetrics();           // lets us measure the text
+        int x = (GameSettings.BASE_WIDTH - metrics.stringWidth(text)) / 2;   // centered
+        int y = GameSettings.BASE_HEIGHT - 30;
+
+        g2.setColor(Color.BLACK);
+        g2.drawString(text, x + 1, y + 1);                   // shadow, so it reads on any tile
+        g2.setColor(Color.WHITE);
+        g2.drawString(text, x, y);
     }
 
     private void drawHealthBar(Graphics2D g2, Player player) {
