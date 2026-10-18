@@ -27,6 +27,8 @@ public class EntityManager {
         pendingAdd.add(entity);
     }
 
+    // ----- Update -----
+
     public void update() {
         // 1. Let the new arrivals in
         entities.addAll(pendingAdd);
@@ -37,9 +39,33 @@ public class EntityManager {
             e.update(this);
         }
 
-        // 3. Throw away removed entities
+        // 3. Now that everyone has moved, check who touches the player
+        checkContactDamage();
+
+        // 4. Throw away removed entities
+        removeInactive();
+    }
+
+    // Hurts the player if they touch anything that can cause damage
+    private void checkContactDamage() {
+        if (!player.isAlive()) return;                 // nothing to hurt while dying
+
+        for (Entity e : entities) {
+            if (!(e instanceof DamageSource)) continue;    // only things that can hurt
+            if (!e.overlaps(player)) continue;             // hitboxes must touch
+
+            if (e instanceof HarmfulPlant) {
+                ((HarmfulPlant) e).onTouch(player);        // the plant applies its own cooldown
+            }
+            // Enemies and dangerous animals will get their own branch when we build them
+        }
+    }
+
+    private void removeInactive() {
         entities.removeIf(e -> !e.isActive());
     }
+
+    // ----- Draw -----
 
     public void draw(Graphics2D g2, int camX, int camY) {
         // Sort by the entity's FEET (y + height): the one lower on screen draws last,
@@ -49,19 +75,20 @@ public class EntityManager {
             e.draw(g2, camX, camY);
         }
     }
- 
-    public Player getPlayer() { return player; }
+
+    // ----- Searching -----
+
     // Finds the CLOSEST thing the player can interact with right now, or null if none.
     public Interactable findInteractableNear(Player player) {
         Interactable best = null;
         double bestDistance = Double.MAX_VALUE;
 
         for (Entity e : entities) {
-             if (!(e instanceof Interactable)) continue;       // trees, cacti, boars... skip
-             Interactable candidate = (Interactable) e;        // treat it as the promise it signed
-             if (!candidate.canInteract(player)) continue;     // too far, or not ready
+            if (!(e instanceof Interactable)) continue;       // trees, cacti, boars... skip
+            Interactable candidate = (Interactable) e;        // treat it as the promise it signed
+            if (!candidate.canInteract(player)) continue;     // too far, or not ready
+
             double distance = e.distanceTo(player);
-         
             if (distance < bestDistance) {
                 best = candidate;
                 bestDistance = distance;
@@ -69,5 +96,25 @@ public class EntityManager {
         }
         return best;
     }
+
+    // Returns every active entity whose center is within 'radius' pixels of the point (x, y).
+    // Other code uses this to avoid looping over every entity in the world.
+    public List<Entity> getEntitiesNear(double x, double y, double radius) {
+        List<Entity> result = new ArrayList<>();
+        for (Entity e : entities) {
+            if (!e.isActive()) continue;
+            double dx = e.getCenterX() - x;
+            double dy = e.getCenterY() - y;
+            // Compare SQUARED distances: same answer as Pythagoras, but no slow square root
+            if (dx * dx + dy * dy <= radius * radius) {
+                result.add(e);
+            }
+        }
+        return result;
+    }
+
+    // ----- Getters -----
+
+    public Player getPlayer() { return player; }
     public TileMap getMap() { return map; }
 }

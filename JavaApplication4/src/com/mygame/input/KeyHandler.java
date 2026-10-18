@@ -58,12 +58,6 @@ public class KeyHandler implements KeyListener {
             case KeyEvent.VK_RIGHT:
                 rightPressed = isPressed;
                 break;
-            case KeyEvent.VK_K:
-                if (isPressed && !damageKeyHeld){
-                    damageRequested = true;
-                }
-                damageKeyHeld = isPressed;
-                break;
             case KeyEvent.VK_E:
                 if (isPressed && !interactKeyHeld) {
                     interactRequested = true;     // one press = one request, even if E is held

@@ -2,11 +2,13 @@ package com.mygame.gui;
 
 import com.mygame.entity.EntityManager;
 import com.mygame.entity.Player;
+import com.mygame.entity.ThornyRattan;
 import com.mygame.input.KeyHandler;
 import com.mygame.main.GameSettings;
 import com.mygame.world.Camera;
 import com.mygame.world.TileMap;
 import com.mygame.entity.LifeBerry;
+import com.mygame.entity.Tree;
 
 import javax.swing.JPanel;
 import java.awt.Color;
@@ -58,9 +60,11 @@ public class GamePanel extends JPanel {
         // TYPE_INT_RGB: no transparency needed for the canvas.
         gameScreen = new BufferedImage(GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT,
                 BufferedImage.TYPE_INT_RGB);
-        // TEMPORARY test: a berry two tiles to the right of wherever the player starts.
+        
         // It doesn't matter how big the map is or where the start is, it will be on screen.
         entityManager.add(new LifeBerry(player.getX() + 2 * GameSettings.TILE_SIZE, player.getY()));
+        entityManager.add(new Tree(player.getX() + 4 * GameSettings.TILE_SIZE, player.getY()));
+        entityManager.add(new ThornyRattan(player.getX(), player.getY() + 3 * GameSettings.TILE_SIZE));
     }
     // ----- Getters: the engine uses these to reach things that are private here -----
     public KeyHandler getKeyHandler() { return keyHandler; }

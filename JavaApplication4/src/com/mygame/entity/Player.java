@@ -96,7 +96,7 @@ public class Player extends Creature {
         //    so the player slides along walls. The map comes from the manager.
         double dx = dirX / length * speed;           // 'speed' lives in Creature
         double dy = dirY / length * speed;
-        moveWithCollision(dx, dy, manager.getMap());
+        moveWithCollision(dx, dy, manager);
     }
 
     // Advances the walk/idle animation. isMoving = is a movement key held THIS tick?

@@ -24,4 +24,4 @@ public class Main {
 
         gameEngine.startGameThread();           // start the game loop
     }
-}
+} 

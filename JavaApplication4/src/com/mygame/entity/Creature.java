@@ -2,6 +2,7 @@ package com.mygame.entity;
 
 import com.mygame.world.TileMap;
 import java.awt.Rectangle;
+import java.util.List;
 
 // Anything that moves and can be hurt: the player, villagers, enemies, animals.
 public abstract class Creature extends Entity {
@@ -62,26 +63,47 @@ public abstract class Creature extends Entity {
 
     // ----- Movement with collision (the code you already wrote in Player) -----
 
-    // Moves one axis at a time, so the creature slides along walls
-    protected void moveWithCollision(double dx, double dy, TileMap map) {
-        if (!collides(x + dx, y, map)) {
+    // Moves one axis at a time, so the creature slides along walls.
+    // It now receives the EntityManager (not just the map), because to check solid
+    // entities like trees it needs to see them. The map is reachable through the manager.
+    protected void moveWithCollision(double dx, double dy, EntityManager manager) {
+        if (!collides(x + dx, y, manager)) {
             x += dx;
         }
-        if (!collides(x, y + dy, map)) {
+        if (!collides(x, y + dy, manager)) {
             y += dy;
         }
     }
 
-    // "private": only Creature itself needs this, so the children can't misuse it
-    private boolean collides(double newX, double newY, TileMap map) {
+    // Is the creature blocked if it stood at (newX, newY)? Tiles first, then solid entities.
+    private boolean collides(double newX, double newY, EntityManager manager) {
+        TileMap map = manager.getMap();
         double left = newX + hitbox.x;
         double top = newY + hitbox.y;
         double right = left + hitbox.width - 1;      // -1 = the last pixel INSIDE the box
         double bottom = top + hitbox.height - 1;
 
-        return map.isSolidAtPixel(left, top)
+        boolean blockedByTile = map.isSolidAtPixel(left, top)
             || map.isSolidAtPixel(right, top)
             || map.isSolidAtPixel(left, bottom)
             || map.isSolidAtPixel(right, bottom);
+
+        return blockedByTile || hitsSolidEntity(newX, newY, manager); 
+    }
+
+    // Would our hitbox, standing at (newX, newY), overlap a solid entity?
+    private boolean hitsSolidEntity(double newX, double newY, EntityManager manager) {
+        Rectangle myBox = getHitboxAt(newX, newY);   // from Entity
+
+        // Only look at entities close to us. 64 pixels is two tiles: plenty for now.
+        List<Entity> nearby = manager.getEntitiesNear(newX + width / 2.0, newY + height / 2.0, 64);
+        for (Entity other : nearby) {
+            if (other == this) continue;             // never block yourself
+            if (!other.isSolid()) continue;          // berries and creatures don't block
+            if (myBox.intersects(other.getHitboxAt(other.getX(), other.getY()))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
