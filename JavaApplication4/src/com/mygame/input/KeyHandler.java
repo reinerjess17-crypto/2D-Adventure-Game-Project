@@ -17,7 +17,7 @@ public class KeyHandler implements KeyListener {
     public volatile boolean damageRequested;
     public volatile boolean interactRequested;   
     private boolean interactKeyHeld;
-    private boolean damageKeyHeld;
+    
 
     // Called by Swing when a key goes DOWN
     @Override

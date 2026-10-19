@@ -63,6 +63,14 @@ public class TileMap {
     public int getWidthInPixels() { return mapCols * GameSettings.TILE_SIZE; }
     public int getHeightInPixels() { return mapRows * GameSettings.TILE_SIZE; }
 
+    // Map size in TILES (the pixel sizes above are these times TILE_SIZE)
+    public int getCols() { return mapCols; }
+    public int getRows() { return mapRows; }
+
+    // Which tile type is at this column and row? (WATER, SAND or LAND)
+    // The caller must give a column and row inside the map.
+    public byte getTile(int col, int row) { return map[row][col]; }
+
     // ---------------------------------------------------------------
     // MAP LOADING
     // ---------------------------------------------------------------

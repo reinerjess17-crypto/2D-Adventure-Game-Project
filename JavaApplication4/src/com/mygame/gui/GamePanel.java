@@ -2,13 +2,12 @@ package com.mygame.gui;
 
 import com.mygame.entity.EntityManager;
 import com.mygame.entity.Player;
-import com.mygame.entity.ThornyRattan;
 import com.mygame.input.KeyHandler;
 import com.mygame.main.GameSettings;
 import com.mygame.world.Camera;
 import com.mygame.world.TileMap;
-import com.mygame.entity.LifeBerry;
-import com.mygame.entity.Tree;
+import com.mygame.entity.EntityType;
+
 
 import javax.swing.JPanel;
 import java.awt.Color;
@@ -61,11 +60,19 @@ public class GamePanel extends JPanel {
         gameScreen = new BufferedImage(GameSettings.BASE_WIDTH, GameSettings.BASE_HEIGHT,
                 BufferedImage.TYPE_INT_RGB);
         
-        // It doesn't matter how big the map is or where the start is, it will be on screen.
-        entityManager.add(new LifeBerry(player.getX() + 2 * GameSettings.TILE_SIZE, player.getY()));
-        entityManager.add(new Tree(player.getX() + 4 * GameSettings.TILE_SIZE, player.getY()));
-        entityManager.add(new ThornyRattan(player.getX(), player.getY() + 3 * GameSettings.TILE_SIZE));
-    }
+        // One berry near the start, so you always have something to test with.
+        // spawn() builds it from its TYPE, so GamePanel no longer needs to import
+        // LifeBerry, Tree or SharpCactus (you can delete those imports).
+        entityManager.spawn(EntityType.LIFE_BERRY,
+            player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
+
+        entityManager.spawn(EntityType.CARABAO, player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
+
+        // Fill the world. Reads as: "put this on about N% of these tiles".
+        entityManager.scatter(EntityType.TREE, TileMap.LAND, 0.01);          // 1 grass tile in 100
+        entityManager.scatter(EntityType.LIFE_BERRY, TileMap.LAND, 0.003);
+        entityManager.scatter(EntityType.SHARP_CACTUS, TileMap.SAND, 0.005);}
+
     // ----- Getters: the engine uses these to reach things that are private here -----
     public KeyHandler getKeyHandler() { return keyHandler; }
     public Camera getCamera() { return camera; }
@@ -90,10 +97,10 @@ public class GamePanel extends JPanel {
         // 2. The player on top of the world
         player.draw(g2, camera.getX(), camera.getY());
 
+        entityManager.draw(g2, camera.getX(), camera.getY());
+        
         // 3. The HUD always goes last: it sits on top of everything
         hud.draw(g2, player);         // always last: it sits on top of everything
-
-        entityManager.draw(g2, camera.getX(), camera.getY());
 
         g2.dispose();   // release the drawing tool
     }

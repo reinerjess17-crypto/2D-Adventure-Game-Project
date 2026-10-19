@@ -1,7 +1,13 @@
 package com.mygame.entity;
 
 import com.mygame.world.TileMap;
+
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Composite;
+import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.util.List;
 
 // Anything that moves and can be hurt: the player, villagers, enemies, animals.
@@ -17,7 +23,18 @@ public abstract class Creature extends Entity {
     // "final": a creature keeps the same set for its whole life.
     protected final SpriteSet sprites;
 
-    protected Creature(double x, double y, int width, int height, int maxHealth, double speed, SpriteSet sprites) {
+    // ----- Animation (shared by EVERY creature) -----
+    protected boolean moving = false;             // true = show the walk frames, false = show the idle image
+    protected int animTimer = 0;                  // counts ticks since the last frame change
+    protected int frameIndex = 0;                 // which walking frame is showing (0 to walkFrames - 1)
+    protected int walkTicksPerFrame = 8;          // 8 ticks = 7.5 frames per second. A child can change it
+                                                  // (for example a boar could use a smaller number to look faster)
+
+    // The last parameter is the creature's SpriteSet. Each child decides which one
+    // it needs and passes it up, for example:
+    //   super(x, y, 32, 32, 100, 2.0, SpriteSet.load("/res/player", 4));
+    protected Creature(double x, double y, int width, int height,
+                       int maxHealth, double speed, SpriteSet sprites) {
         super(x, y, width, height);               // let Entity set up the position and size
         this.maxHealth = maxHealth;
         this.health = maxHealth;                  // creatures start at full health
@@ -28,7 +45,7 @@ public abstract class Creature extends Entity {
     }
 
     // ----- Timers -----
- 
+
     // Counts the invulnerability down by one tick. The child calls this ONCE at the
     // start of its update(). We can't do it here automatically, because update() is
     // still abstract in Creature: each child writes its own.
@@ -61,10 +78,83 @@ public abstract class Creature extends Entity {
     // an enemy drops loot and disappears. So the PARENT only says "something must happen".
     protected abstract void onDeath();
 
-    // ----- Movement with collision (the code you already wrote in Player) -----
+    // ----- Animation -----
+
+    // The child calls this once per tick and says whether it is moving THIS tick.
+    // It switches between walking and idle, and advances the walk frames.
+    protected void updateAnimation(boolean isMoving) {
+        // We just started walking or just stopped: restart the cycle from frame 0
+        if (isMoving != moving) {
+            moving = isMoving;
+            animTimer = 0;
+            frameIndex = 0;
+        }
+        if (!moving) return;      // the idle picture is a single image: nothing to advance
+
+        animTimer++;
+        if (animTimer >= walkTicksPerFrame) {
+            animTimer = 0;
+            frameIndex = (frameIndex + 1) % sprites.getWalkFrames();
+        }
+    }
+
+    // Draws the creature's current picture, fully visible
+    protected void drawSprite(Graphics2D g2, int camX, int camY) {
+        drawSprite(g2, camX, camY, 1f);
+    }
+
+    // The same, with transparency: 1 = fully visible, 0 = invisible.
+    // The player uses it to fade out while dying. Two methods with the same name but
+    // different parameters is called "overloading".
+    protected void drawSprite(Graphics2D g2, int camX, int camY, float alpha) {
+        // Walking frame while moving, idle image when still
+        BufferedImage image = moving ? sprites.getWalk(facing, frameIndex)
+                                     : sprites.getIdle(facing);
+        // WORLD position minus camera position = SCREEN position
+        int screenX = (int) Math.round(x) - camX;
+        int screenY = (int) Math.round(y) - camY;
+
+        if (image == null) {
+            // The picture is missing: draw a bright box, so you can still SEE and test
+            // the creature before its art is ready (same idea as the magenta tiles).
+            g2.setColor(Color.MAGENTA);
+            g2.fillRect(screenX, screenY, width, height);
+            return;
+        }
+
+        // Center the picture horizontally and put its bottom on the bottom of the entity
+        int drawX = screenX + (width - image.getWidth()) / 2;
+        int drawY = screenY + height - image.getHeight();
+
+        Composite oldComposite = g2.getComposite();    // remember the normal setting
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        g2.drawImage(image, drawX, drawY, null);
+        g2.setComposite(oldComposite);                 // ALWAYS put it back
+    }
+
+    // ----- Walking -----
+
+    // Walks one step in the direction of the vector (dirX, dirY), at the given speed.
+    // The vector can be ANY length (it gets normalized) and can point anywhere:
+    // (1, 0) = right, or "from me to the player" = (player.x - x, player.y - y).
+    // It also turns the creature to face that way.
+    // Returns true if the creature really moved, false if something blocked it.
+    protected boolean walk(double dirX, double dirY, double moveSpeed, EntityManager manager) {
+        double length = Math.sqrt(dirX * dirX + dirY * dirY);
+        if (length == 0) return false;                       // no direction: nothing to do
+
+        facing = Direction.fromVector(dirX, dirY);
+
+        double oldX = x;
+        double oldY = y;
+        moveWithCollision(dirX / length * moveSpeed, dirY / length * moveSpeed, manager);
+        return x != oldX || y != oldY;                       // did the position change?
+    }
+
+    // ----- Movement with collision -----
 
     // Moves one axis at a time, so the creature slides along walls.
-    // It now receives the EntityManager (not just the map), because to check solid
+    // It receives the EntityManager (not just the map), because to check solid
     // entities like trees it needs to see them. The map is reachable through the manager.
     protected void moveWithCollision(double dx, double dy, EntityManager manager) {
         if (!collides(x + dx, y, manager)) {
@@ -88,7 +178,7 @@ public abstract class Creature extends Entity {
             || map.isSolidAtPixel(left, bottom)
             || map.isSolidAtPixel(right, bottom);
 
-        return blockedByTile || hitsSolidEntity(newX, newY, manager); 
+        return blockedByTile || hitsSolidEntity(newX, newY, manager);
     }
 
     // Would our hitbox, standing at (newX, newY), overlap a solid entity?
@@ -96,7 +186,8 @@ public abstract class Creature extends Entity {
         Rectangle myBox = getHitboxAt(newX, newY);   // from Entity
 
         // Only look at entities close to us. 64 pixels is two tiles: plenty for now.
-        List<Entity> nearby = manager.getEntitiesNear(newX + width / 2.0, newY + height / 2.0, 64);
+        List<Entity> nearby = manager.getEntitiesNear(newX + width / 2.0,
+                                                      newY + height / 2.0, 64);
         for (Entity other : nearby) {
             if (other == this) continue;             // never block yourself
             if (!other.isSolid()) continue;          // berries and creatures don't block
