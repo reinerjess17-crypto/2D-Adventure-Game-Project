@@ -71,4 +71,8 @@ public abstract class Entity {
     public double getY() { return y; }
     public int getWidth() { return width; }
     public int getHeight() { return height; }
+    public void setPosition(double newX, double newY){
+        x = newX;
+        y = newY;
+    }
 }

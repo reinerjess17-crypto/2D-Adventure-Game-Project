@@ -9,7 +9,7 @@ import java.awt.Graphics2D;
 //   position, size, hitbox, health, speed, facing, sprites, takeDamage(), heal(),
 //   moveWithCollision(), the walk animation, drawSprite()
 // This class only contains what is special about the player:
-// keyboard control, interaction, and the death and respawn sequence.
+// keyboard control, interaction, riding, and the death and respawn sequence.
 public class Player extends Creature {
 
     // ----- Constants -----
@@ -26,6 +26,7 @@ public class Player extends Creature {
     private int stateTimer = 0;           // ticks spent in the current state
 
     private Interactable interactTarget;  // the closest thing we could use right now (or null)
+    private Carabao mount;                // the animal we are riding (null = walking)
 
     // Where the player comes back after dying (world pixels)
     private double spawnX;
@@ -59,8 +60,14 @@ public class Player extends Creature {
             return;
         }
 
-        // Look around every tick, so the HUD can show a prompt while we stand near something
-        interactTarget = manager.findInteractableNear(this);
+        // What can E do right now?
+        //  - riding: the only thing is getting off (the HUD shows "[E] Dismount")
+        //  - walking: use the closest thing nearby (if any)
+        if (mount != null) {
+            interactTarget = mount;
+        } else {
+            interactTarget = manager.findInteractableNear(this);
+        }
         if (keys.interactRequested) {
             keys.interactRequested = false;         // consume the press: one press = one use
             tryInteract();
@@ -81,15 +88,23 @@ public class Player extends Creature {
         boolean isMoving = length > 0;
 
         updateAnimation(isMoving);                   // now lives in Creature
-        if (!isMoving) return;                       // no keys: nothing to move
 
-        facing = Direction.fromInput(dirX, dirY);    // 'facing' lives in Creature
+        if (isMoving) {
+            facing = Direction.fromInput(dirX, dirY);    // 'facing' lives in Creature
 
-        // 3. Move. moveWithCollision (in Creature) checks X and Y separately,
-        //    so the player slides along walls and around trees.
-        double dx = dirX / length * speed;           // 'speed' lives in Creature
-        double dy = dirY / length * speed;
-        moveWithCollision(dx, dy, manager);
+            // 3. Move. moveWithCollision (in Creature) checks X and Y separately,
+            //    so the player slides along walls and around trees.
+            //    'speed' lives in Creature: it is the walk speed, or the ride speed while riding.
+            double dx = dirX / length * speed;
+            double dy = dirY / length * speed;
+            moveWithCollision(dx, dy, manager);
+        }
+
+        // 4. If we ride, the animal copies our position, direction and animation NOW,
+        //    after we moved. This must run whether we moved or not, so it has no "return" before it.
+        if (mount != null) {
+            mount.followRider();
+        }
     }
 
     // ----- Interaction -----
@@ -104,16 +119,41 @@ public class Player extends Creature {
     // The HUD reads this to show the prompt
     public Interactable getInteractTarget() { return interactTarget; }
 
+    // ----- Riding -----
+
+    // Called by Carabao.mount(). From now on we move at the animal's speed.
+    void startRiding(Carabao carabao) {
+        mount = carabao;
+        speed = carabao.getRideSpeed();
+    }
+
+    // Called by Carabao.dismount(). Back to walking.
+    void stopRiding() {
+        mount = null;
+        speed = WALK_SPEED;
+    }
+
+    public boolean isRiding() { return mount != null; }
+
     // ----- Draw -----
 
     @Override
     public void draw(Graphics2D g2, int camX, int camY) {
+        // While riding, the carabao draws us on its back. If we drew ourselves too,
+        // there would be two of us.
+        if (mount != null) return;
+
         // 1 = fully visible, 0 = invisible. While dying, the sprite is gone by the halfway point.
         float alpha = 1f;
         if (state == PlayerState.DYING) {
             alpha = Math.max(0f, 1f - 2f * stateTimer / DYING_TICKS);
         }
-        drawSprite(g2, camX, camY, alpha);           // the drawing itself now lives in Creature
+        drawSprite(g2, camX, camY, alpha);           // the drawing itself lives in Creature
+    }
+
+    // Called by the carabao to draw us on its back, 'lift' pixels higher than our feet
+    void drawAsRider(Graphics2D g2, int camX, int camY, int lift) {
+        drawSprite(g2, camX, camY, 1f, -lift);       // negative offset = UP on the screen
     }
 
     // ----- Health -----
@@ -135,6 +175,9 @@ public class Player extends Creature {
     // The player does not vanish: it starts the dying sequence.
     @Override
     protected void onDeath() {
+        if (mount != null) {
+            mount.dismount();         // you fall off. dismount() also calls stopRiding() on us.
+        }
         state = PlayerState.DYING;
         stateTimer = 0;
         moving = false;               // stand still while dying

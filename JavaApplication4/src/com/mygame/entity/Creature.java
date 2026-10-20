@@ -73,6 +73,8 @@ public abstract class Creature extends Entity {
     public boolean isAlive() { return health > 0; }
     public int getHealth() { return health; }
     public int getMaxHealth() { return maxHealth; }
+    public Direction getFacing() { return facing; }
+    public boolean isMoving() { return moving; }
 
     // Each kind of creature dies differently: the player fades and respawns,
     // an enemy drops loot and disappears. So the PARENT only says "something must happen".
@@ -107,12 +109,18 @@ public abstract class Creature extends Entity {
     // The player uses it to fade out while dying. Two methods with the same name but
     // different parameters is called "overloading".
     protected void drawSprite(Graphics2D g2, int camX, int camY, float alpha) {
+        drawSprite(g2, camX, camY, alpha, 0);
+    }
+
+    // The full version. offsetY moves the picture on the screen: negative = UP.
+    // A rider uses it to sit higher than the animal's feet.
+    protected void drawSprite(Graphics2D g2, int camX, int camY, float alpha, int offsetY) {
         // Walking frame while moving, idle image when still
         BufferedImage image = moving ? sprites.getWalk(facing, frameIndex)
                                      : sprites.getIdle(facing);
         // WORLD position minus camera position = SCREEN position
         int screenX = (int) Math.round(x) - camX;
-        int screenY = (int) Math.round(y) - camY;
+        int screenY = (int) Math.round(y) - camY + offsetY;
 
         if (image == null) {
             // The picture is missing: draw a bright box, so you can still SEE and test
