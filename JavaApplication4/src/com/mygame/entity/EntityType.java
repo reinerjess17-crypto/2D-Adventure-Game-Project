@@ -11,5 +11,6 @@ public enum EntityType {
     SHARP_CACTUS,
     LIFE_BERRY,
     TREE,
-    CARABAO
+    CARABAO,
+    WILDBOAR,
 }

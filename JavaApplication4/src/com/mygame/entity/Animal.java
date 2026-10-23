@@ -79,7 +79,7 @@ public abstract class Animal extends Creature {
         }
     }
 
-    private void startIdle() {
+    protected void startIdle() {
         animalState = AnimalState.IDLE;
         wanderTimer = randomBetween(IDLE_MIN, IDLE_MAX);
     }

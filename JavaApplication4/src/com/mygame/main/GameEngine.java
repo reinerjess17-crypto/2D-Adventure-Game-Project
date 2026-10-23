@@ -2,7 +2,6 @@ package com.mygame.main;
 
 import com.mygame.entity.Player;
 import com.mygame.gui.GamePanel;
-import com.mygame.input.KeyHandler;
 import com.mygame.world.Camera;
 import com.mygame.world.TileMap;
 import com.mygame.entity.EntityManager;
@@ -54,7 +53,7 @@ public class GameEngine implements Runnable {
     // Runs once per frame. The ORDER of the steps matters.
     public void update() {
         // Get the objects we need from the panel
-        KeyHandler keys = gamePanel.getKeyHandler();
+       
         Camera camera = gamePanel.getCamera();
         TileMap map = gamePanel.getTileMap();
         Player player = gamePanel.getPlayer();

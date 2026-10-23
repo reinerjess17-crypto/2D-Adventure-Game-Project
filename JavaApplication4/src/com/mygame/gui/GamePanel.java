@@ -66,7 +66,9 @@ public class GamePanel extends JPanel {
         entityManager.spawn(EntityType.LIFE_BERRY,
             player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
 
-        entityManager.spawn(EntityType.CARABAO, player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
+        entityManager.spawn(EntityType.CARABAO, player.getX() + 5 * GameSettings.TILE_SIZE, player.getY());
+
+        entityManager.spawn(EntityType.WILDBOAR, player.getX() + 6 * GameSettings.TILE_SIZE, player.getY());
 
         // Fill the world. Reads as: "put this on about N% of these tiles".
         entityManager.scatter(EntityType.TREE, TileMap.LAND, 0.01);          // 1 grass tile in 100
