@@ -27,6 +27,7 @@ public class Player extends Creature {
 
     private Interactable interactTarget;  // the closest thing we could use right now (or null)
     private Carabao mount;                // the animal we are riding (null = walking)
+    private Tiyanak grabber;              // the enemy holding on to us (null = free)
 
     // Where the player comes back after dying (world pixels)
     private double spawnX;
@@ -56,9 +57,27 @@ public class Player extends Creature {
         if (state != PlayerState.ALIVE) {
             interactTarget = null;                  // nothing to use while dying
             keys.interactRequested = false;         // forget presses made during the fade
+            keys.struggleRequested = false;
             updateDeathSequence();
             return;
         }
+
+        // GRABBED: we cannot walk or use anything. The only thing left is to shake the enemy off:
+        // every SPACE press hurts it, and when it dies, endGrab() sets us free.
+        if (grabber != null) {
+            interactTarget = null;
+            keys.interactRequested = false;
+            updateAnimation(false);                 // standing still
+            if (keys.struggleRequested) {
+                keys.struggleRequested = false;     // one press = one hit
+                grabber.struggle();
+            }
+            if (mount != null) {
+                mount.followRider();                // the animal stays under us
+            }
+            return;
+        }
+        keys.struggleRequested = false;             // SPACE does nothing when we are free
 
         // What can E do right now?
         //  - riding: the only thing is getting off (the HUD shows "[E] Dismount")
@@ -135,6 +154,23 @@ public class Player extends Creature {
 
     public boolean isRiding() { return mount != null; }
 
+    // ----- Being grabbed -----
+
+    // Called by Tiyanak when it lands on us
+    void startGrab(Tiyanak enemy) {
+        grabber = enemy;
+    }
+
+    // Called by Tiyanak when it dies or lets go
+    void endGrab() {
+        grabber = null;
+    }
+
+    public boolean isGrabbed() { return grabber != null; }
+
+    // The HUD reads this to show how much strength the enemy has left
+    public Creature getGrabber() { return grabber; }
+
     // ----- Draw -----
 
     @Override
@@ -177,6 +213,9 @@ public class Player extends Creature {
     protected void onDeath() {
         if (mount != null) {
             mount.dismount();         // you fall off. dismount() also calls stopRiding() on us.
+        }
+        if (grabber != null) {
+            grabber.release();        // the enemy lets go and goes back to hiding
         }
         state = PlayerState.DYING;
         stateTimer = 0;

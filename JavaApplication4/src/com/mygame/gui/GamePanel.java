@@ -63,6 +63,9 @@ public class GamePanel extends JPanel {
         // One berry near the start, so you always have something to test with.
         // spawn() builds it from its TYPE, so GamePanel no longer needs to import
         // LifeBerry, Tree or SharpCactus (you can delete those imports).
+        entityManager.spawn(EntityType.TIYANAK,
+            player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
+        
         entityManager.spawn(EntityType.LIFE_BERRY,
             player.getX() + 2 * GameSettings.TILE_SIZE, player.getY());
 

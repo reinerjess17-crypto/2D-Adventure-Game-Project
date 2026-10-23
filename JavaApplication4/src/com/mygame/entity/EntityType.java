@@ -13,4 +13,5 @@ public enum EntityType {
     TREE,
     CARABAO,
     WILDBOAR,
+    TIYANAK
 }

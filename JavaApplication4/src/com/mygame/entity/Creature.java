@@ -57,8 +57,17 @@ public abstract class Creature extends Entity {
 
     // ----- Health: every change goes through these methods -----
 
+    // Normal damage (a bite, a hit): ignored while the creature is dead or protected
     public void takeDamage(int amount) {
         if (!isAlive() || invulnerableTicks > 0) return;   // can't hurt the dead or the protected
+        drainHealth(amount);
+    }
+
+    // Health loss that IGNORES the protection timer: being drained, poison, bleeding...
+    // These happen again and again, so they must not be blocked by the last hit's protection.
+    // (A dead creature still can't lose more.)
+    public void drainHealth(int amount) {
+        if (!isAlive()) return;
         health = Math.max(0, health - amount);             // never below 0
         if (health == 0) {
             onDeath();

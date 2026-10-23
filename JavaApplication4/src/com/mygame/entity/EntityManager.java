@@ -123,9 +123,9 @@ public class EntityManager {
     // ----- Draw -----
 
     public void draw(Graphics2D g2, int camX, int camY) {
-        // Sort by the entity's FEET (y + height): the one lower on screen draws last,
+        // Sort by the entity's FEET (see Entity.getSortY): the one lower on screen draws last,
         // so it appears in FRONT. This is how a player can walk behind a tree.
-        entities.sort(Comparator.comparingDouble(e -> e.getY() + e.getHeight()));
+        entities.sort(Comparator.comparingDouble(Entity::getSortY));
         for (Entity e : entities) {
             e.draw(g2, camX, camY);
         }

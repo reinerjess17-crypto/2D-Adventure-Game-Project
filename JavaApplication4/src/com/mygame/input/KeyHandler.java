@@ -14,10 +14,15 @@ public class KeyHandler implements KeyListener {
     // always sees the newest value instead of an old copy.
     public volatile boolean upPressed, downPressed, leftPressed, rightPressed;
 
-    public volatile boolean damageRequested;
-    public volatile boolean interactRequested;   
+    // E = interact. A one-shot flag: true for ONE press, even if the key is held.
+    // The player sets it back to false after using it.
+    public volatile boolean interactRequested;
     private boolean interactKeyHeld;
-    
+
+    // SPACE = struggle (shake off an enemy that holds the player).
+    // Same one-shot idea: every NEW press counts once, holding the key does nothing.
+    public volatile boolean struggleRequested;
+    private boolean struggleKeyHeld;
 
     // Called by Swing when a key goes DOWN
     @Override
@@ -63,6 +68,12 @@ public class KeyHandler implements KeyListener {
                     interactRequested = true;     // one press = one request, even if E is held
                 }
                 interactKeyHeld = isPressed;
+                break;
+            case KeyEvent.VK_SPACE:
+                if (isPressed && !struggleKeyHeld) {
+                    struggleRequested = true;     // every press counts: mash it!
+                }
+                struggleKeyHeld = isPressed;
                 break;
         }
     }

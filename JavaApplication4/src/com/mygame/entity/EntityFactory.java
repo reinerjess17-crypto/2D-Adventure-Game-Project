@@ -20,6 +20,7 @@ public class EntityFactory {
             case TREE:         return new Tree(x, y);          // random look
             case CARABAO:      return new Carabao(x, y);
             case WILDBOAR:     return new WildBoar(x,y);
+            case TIYANAK:      return new Tiyanak(x, y);
             default:
                 // A type was added to the enum but not to this list. Fail LOUDLY, now,
                 // instead of spawning nothing and leaving you confused.

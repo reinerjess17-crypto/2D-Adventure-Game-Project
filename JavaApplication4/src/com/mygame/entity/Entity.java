@@ -43,6 +43,11 @@ public abstract class Entity {
     public double getCenterX() { return x + width / 2.0; }
     public double getCenterY() { return y + height / 2.0; }
 
+    // The number EntityManager uses to decide who is drawn in front: the entity's FEET.
+    // A bigger number = drawn later = in front. A child can override it when it must
+    // appear in front of (or behind) something that stands at the same place.
+    public double getSortY() { return y + height; }
+
     // The hitbox as it would be if the entity stood at (newX, newY), in world pixels
     public Rectangle getHitboxAt(double newX, double newY) {
         return new Rectangle((int) Math.round(newX) + hitbox.x,
@@ -66,13 +71,16 @@ public abstract class Entity {
     public boolean isActive() { return active; }
     public void remove() { active = false; }
 
+    // Puts the entity at a new WORLD position. Used when something must be placed exactly:
+    // the player hopping onto a carabao, a rider following its mount, a respawn...
+    public void setPosition(double newX, double newY) {
+        x = newX;
+        y = newY;
+    }
+
     // Getters. Other classes can't read protected fields, so they ask through these.
     public double getX() { return x; }
     public double getY() { return y; }
     public int getWidth() { return width; }
     public int getHeight() { return height; }
-    public void setPosition(double newX, double newY){
-        x = newX;
-        y = newY;
-    }
 }
