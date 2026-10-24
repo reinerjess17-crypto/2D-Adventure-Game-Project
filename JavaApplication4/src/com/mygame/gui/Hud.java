@@ -1,5 +1,6 @@
 package com.mygame.gui;
 
+import com.mygame.entity.Conversation;
 import com.mygame.entity.Creature;
 import com.mygame.entity.Interactable;
 import com.mygame.entity.Player;
@@ -10,6 +11,8 @@ import java.awt.Color;
 import java.awt.Composite;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.util.ArrayList;
+import java.util.List;
 
 // Everything drawn on top of the game that is NOT part of the world:
 // the life bar, the interaction prompt, the struggle bar, and later items, dialogue and menus.
@@ -25,6 +28,7 @@ public class Hud {
         drawHealthBar(g2, player);
         drawInteractPrompt(g2, player);
         drawStruggle(g2, player);
+        drawDialogue(g2, player);
         drawFadeOverlay(g2, player);   // last, so it covers the bar too
     }
 
@@ -76,6 +80,67 @@ public class Hud {
         g2.fillRect(barX, barY, (int) Math.round(barWidth * ratio), barHeight);
         g2.setColor(Color.WHITE);
         g2.drawRect(barX - 1, barY - 1, barWidth + 1, barHeight + 1);
+    }
+
+    // The conversation box at the bottom of the screen: the speaker's name, the current line
+    // (cut into rows that fit), and a hint with the page number and what E does.
+    private void drawDialogue(Graphics2D g2, Player player) {
+        Conversation talk = player.getConversation();
+        if (talk == null) return;                            // nobody is talking: draw nothing
+
+        int boxX = 20;
+        int boxWidth = GameSettings.BASE_WIDTH - 40;
+        int boxHeight = 92;
+        int boxY = GameSettings.BASE_HEIGHT - boxHeight - 14;
+
+        // The box: dark and mostly solid, with a white border
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.88f));
+        g2.setColor(new Color(15, 15, 35));
+        g2.fillRoundRect(boxX, boxY, boxWidth, boxHeight, 10, 10);
+        g2.setComposite(oldComposite);
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(boxX, boxY, boxWidth, boxHeight, 10, 10);
+
+        FontMetrics metrics = g2.getFontMetrics();
+
+        // Speaker name in gold
+        g2.setColor(new Color(240, 200, 80));
+        g2.drawString(talk.getSpeakerName(), boxX + 12, boxY + 20);
+
+        // The line, wrapped into rows
+        g2.setColor(Color.WHITE);
+        int rowY = boxY + 40;
+        for (String row : wrapText(talk.getCurrentLine(), metrics, boxWidth - 24)) {
+            g2.drawString(row, boxX + 12, rowY);
+            rowY += metrics.getHeight();
+        }
+
+        // Bottom right: "2/6   [E] Next"  (or "Close" on the last line)
+        String hint = talk.getLineNumber() + "/" + talk.getLineCount()
+                + "    [E] " + (talk.isLastLine() ? "Close" : "Next");
+        g2.setColor(Color.LIGHT_GRAY);
+        g2.drawString(hint, boxX + boxWidth - metrics.stringWidth(hint) - 12, boxY + boxHeight - 8);
+    }
+
+    // Cuts a long text into rows that are not wider than maxWidth pixels. It breaks only between words.
+    private List<String> wrapText(String text, FontMetrics metrics, int maxWidth) {
+        List<String> rows = new ArrayList<>();
+        StringBuilder row = new StringBuilder();
+
+        for (String word : text.split(" ")) {
+            String attempt = row.length() == 0 ? word : row + " " + word;
+            if (metrics.stringWidth(attempt) <= maxWidth || row.length() == 0) {
+                row = new StringBuilder(attempt);           // it fits: keep adding to this row
+            } else {
+                rows.add(row.toString());                   // it does not fit: close the row, start a new one
+                row = new StringBuilder(word);
+            }
+        }
+        if (row.length() > 0) {
+            rows.add(row.toString());
+        }
+        return rows;
     }
 
     // Draws a line of text centered on the screen, on a dark see-through box

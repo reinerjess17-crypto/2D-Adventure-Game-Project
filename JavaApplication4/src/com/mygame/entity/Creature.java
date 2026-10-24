@@ -94,6 +94,10 @@ public abstract class Creature extends Entity {
     // The child calls this once per tick and says whether it is moving THIS tick.
     // It switches between walking and idle, and advances the walk frames.
     protected void updateAnimation(boolean isMoving) {
+        // A creature drawn with NO walking frames (a villager) always shows its standing picture
+        if (sprites.getWalkFrames() == 0) {
+            isMoving = false;
+        }
         // We just started walking or just stopped: restart the cycle from frame 0
         if (isMoving != moving) {
             moving = isMoving;

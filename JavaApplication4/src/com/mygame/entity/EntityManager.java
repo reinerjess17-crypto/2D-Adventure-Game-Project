@@ -27,6 +27,9 @@ public class EntityManager {
 
     private final Random random = new Random();
 
+    // The last number of deaths we knew about. When the player's number grows, he just died.
+    private int knownDeaths = 0;
+
     // Tiles that already got an entity from scatter(). It stops a berry from
     // spawning inside a tree. Each tile is stored as ONE number: row * columns + col.
     private final Set<Long> occupiedTiles = new HashSet<>();
@@ -96,6 +99,7 @@ public class EntityManager {
 
         // 3. Now that everyone has moved, check who touches the player
         checkContactDamage();
+        checkPlayerDeath();
 
         // 4. Throw away removed entities
         removeInactive();
@@ -113,6 +117,18 @@ public class EntityManager {
                 ((HarmfulPlant) e).onTouch(player);        // the plant applies its own cooldown
             }
             // Enemies and dangerous animals will get their own branch when we build them
+        }
+    }
+
+    // If the player died since the last tick, tell every villager (they may comment on it later)
+    private void checkPlayerDeath() {
+        if (player.getDeathCount() == knownDeaths) return;
+        knownDeaths = player.getDeathCount();
+
+        for (Entity e : entities) {
+            if (e instanceof Villager) {
+                ((Villager) e).onPlayerDied(player);
+            }
         }
     }
 

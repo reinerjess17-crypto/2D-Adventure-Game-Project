@@ -28,6 +28,9 @@ public class Player extends Creature {
     private Interactable interactTarget;  // the closest thing we could use right now (or null)
     private Carabao mount;                // the animal we are riding (null = walking)
     private Tiyanak grabber;              // the enemy holding on to us (null = free)
+    private Conversation conversation;    // the talk we are in right now (null = not talking)
+    private int deathCount = 0;           // how many times we have died (villagers react to it)
+    private int wood = 0;                 // TEMPORARY: a tiny "inventory" until the real one exists
 
     // Where the player comes back after dying (world pixels)
     private double spawnX;
@@ -78,6 +81,21 @@ public class Player extends Creature {
             return;
         }
         keys.struggleRequested = false;             // SPACE does nothing when we are free
+
+        // TALKING: we stand still and E turns the page. This comes BEFORE the interaction code
+        // below, so the press that STARTED the talk is not also used to turn the first page.
+        if (conversation != null) {
+            interactTarget = null;
+            updateAnimation(false);
+            if (keys.interactRequested) {
+                keys.interactRequested = false;     // one press = one page
+                advanceConversation();
+            }
+            if (mount != null) {
+                mount.followRider();
+            }
+            return;
+        }
 
         // What can E do right now?
         //  - riding: the only thing is getting off (the HUD shows "[E] Dismount")
@@ -154,11 +172,47 @@ public class Player extends Creature {
 
     public boolean isRiding() { return mount != null; }
 
+    // ----- Talking -----
+
+    // Called by a Talkable (Villager.interact) when we press E near it
+    void startConversation(Talkable partner) {
+        conversation = new Conversation(partner);
+    }
+
+    // E on the last line ends the talk and tells the other person (it may react: give a mission...)
+    private void advanceConversation() {
+        if (!conversation.advance()) {
+            Talkable partner = conversation.getPartner();
+            conversation = null;
+            partner.onConversationEnd(this);
+        }
+    }
+
+    public boolean isTalking() { return conversation != null; }
+
+    // The HUD reads this to draw the dialogue box
+    public Conversation getConversation() { return conversation; }
+
+    // ----- TEMPORARY wood counter (replace with the inventory later) -----
+
+    public void addWood(int amount) { wood += amount; }
+    public int getWood() { return wood; }
+
+    // Takes the wood if we have enough. Returns true if it worked.
+    public boolean spendWood(int amount) {
+        if (wood < amount) return false;
+        wood -= amount;
+        return true;
+    }
+
+    public int getDeathCount() { return deathCount; }
+
     // ----- Being grabbed -----
 
     // Called by Tiyanak when it lands on us
     void startGrab(Tiyanak enemy) {
         grabber = enemy;
+        conversation = null;          // an ambush interrupts any talk
     }
 
     // Called by Tiyanak when it dies or lets go
@@ -217,6 +271,8 @@ public class Player extends Creature {
         if (grabber != null) {
             grabber.release();        // the enemy lets go and goes back to hiding
         }
+        conversation = null;          // a talk ends if we die
+        deathCount++;                 // villagers are told about it by the EntityManager
         state = PlayerState.DYING;
         stateTimer = 0;
         moving = false;               // stand still while dying

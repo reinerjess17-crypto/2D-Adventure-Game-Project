@@ -72,7 +72,9 @@ public class Tree extends UsefulPlant {
     // TEMPORARY: replace with inventory.add(woodItem, woodAmount) when the inventory exists.
     @Override
     protected void applyEffect(Player player) {
-        System.out.println("Gathered " + woodAmount + " " + woodItem.getName());
+        player.addWood(woodAmount);        // TEMPORARY wood counter (replace with the inventory later)
+        System.out.println("Gathered " + woodAmount + " " + woodItem.getName()
+            + " (total: " + player.getWood() + ")");
     }
 
     // Overrides the simple prompt of UsefulPlant to include the amount
