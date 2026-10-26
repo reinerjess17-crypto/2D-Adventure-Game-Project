@@ -21,7 +21,6 @@ public class Main {
         window.setLocationRelativeTo(null);     // centers the window on the screen
         window.setVisible(true);
         gamePanel.requestFocusInWindow();       // makes sure the panel receives key presses
-
         gameEngine.startGameThread();           // start the game loop
     }
 } 

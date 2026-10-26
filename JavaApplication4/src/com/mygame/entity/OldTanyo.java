@@ -63,7 +63,8 @@ public class OldTanyo extends Villager {
 
         switch (questStage) {
             case 0:
-                lines.add("Aba! A traveler. Come closer, hijo, I do not bite.");
+                //"Aba! A traveler. Come closer, hijo, I do not bite."
+                lines.add("Hoy, gago ba't ka nandito, anong ginagawa mo dito?");
                 lines.add("They call me Old Tanyo. I have lived at the edge of this land longer than anyone.");
                 lines.add("Listen well: not every bush is only a bush. Some hide a crying thing that jumps.");
                 lines.add("If it grabs you, do not stand still. Press SPACE again and again until it lets go.");
